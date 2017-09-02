@@ -1,5 +1,5 @@
 const express = require('express')
-const WebSocket  = require('ws')
+const socketio = require('socket.io')
 const http = require('http')
 const bodyParser = require('body-parser')
 const cors = require('cors')
@@ -16,32 +16,32 @@ app.get('/health', (req, res) => {
   res.send('OK')
 })
 
+app.get('/', (req, res) => {
+  res.send('OK')
+})
+
+app.get('/info', (req, res) => {
+  res.send('OK')
+})
+
 app.get('/test', (req, res) => {
   res.sendFile(__dirname + '/test.html')
 })
 
-// app.post('/broadcast', (req, res, next) => {
-//   for (let id in connections) {
-//     connections[id].write('ping')
-//   }
-//   res.send('ping')
-// })
-
 // Websocket
 const server = http.createServer(app)
-const wss = new WebSocket.Server({ server })
+const io = socketio(server)
 
-wss.on('connection', (ws, req) => {
-  const ip = req.connection.remoteAddress
-  logger.info(`[${ip}] New connection`)
+io.on('connection', socket => {
+  logger.info(`New connection`)
 
-  ws.on('message', message => {
-    logger.info(`[${ip}] ${message}`)
-    ws.send(message)
+  socket.on('newMorpheusConnection', data => {
+    logger.info(`newMorpheusConnection`)
+    socket.emit('connectionAccepted')
   })
 
-  ws.on('close', () => {
-    logger.info(`[${ip}] Closed connection`)
+  socket.on('disconnect', () => {
+    logger.info(`Closed connection`)
   })
 })
 
