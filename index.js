@@ -1,10 +1,9 @@
 const express = require('express')
-const sockjs  = require('sockjs')
+const WebSocket  = require('ws')
 const http = require('http')
 const bodyParser = require('body-parser')
 const cors = require('cors')
 const logger = require('./logger')
-const loggerSocket = require('./logger-socket')
 
 // Express
 const app = express()
@@ -21,38 +20,32 @@ app.get('/test', (req, res) => {
   res.sendFile(__dirname + '/test.html')
 })
 
-app.post('/broadcast', (req, res, next) => {
-  for (let id in connections) {
-    connections[id].write('ping')
-  }
-  res.send('ping')
+// app.post('/broadcast', (req, res, next) => {
+//   for (let id in connections) {
+//     connections[id].write('ping')
+//   }
+//   res.send('ping')
+// })
+
+// Websocket
+const server = http.createServer(app)
+const wss = new WebSocket.Server({ server })
+
+wss.on('connection', (ws, req) => {
+  const ip = req.connection.remoteAddress
+  logger.info(`[${ip}] New connection`)
+
+  ws.on('message', message => {
+    logger.info(`[${ip}] ${message}`)
+    ws.send(message)
+  })
+
+  ws.on('close', () => {
+    logger.info(`[${ip}] Closed connection`)
+  })
 })
 
-const expressListener = app.listen((process.env.PORT || 9090), () => {
+// Listen
+server.listen((process.env.PORT || 9090), () => {
   logger.info(`Server listening on port ${process.env.PORT || 9090}`)
 })
-
-// Sockjs
-const sockjsServer = sockjs.createServer({
-  sockjs_url: 'http://cdn.jsdelivr.net/sockjs/1.0.1/sockjs.min.js'})
-const connections = {}
-
-sockjsServer.on('connection', conn => {
-  logger.info(`[${conn.id}] New connection ${conn.pathname.match(/\/receive\/\w+/)}`)
-  connections[conn.id] = conn
-
-  conn.on('data', message => {
-    logger.info(`[${conn.id}] [${conn.pathname.match(/\/receive\/\w+/)}] ${message}`)
-    conn.write(message)
-  })
-
-  conn.on('close', () => {
-    logger.info(`[${conn.id}] Closed connection`)
-    delete connections[conn.id]
-  })
-})
-
-const logSocket = (severity, message) => loggerSocket.log(severity, message)
-
-sockjsServer.installHandlers(
-  expressListener, { prefix: '/receive/(.*)', log: logSocket })
