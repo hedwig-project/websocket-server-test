@@ -49,7 +49,7 @@ io.on('connection', socket => {
       .set(morpheusId, socket.id)
       .set(socket.id, morpheusId)
       .execAsync()
-      .then(() => logger.info(`[Redis] Saved connection information`))
+      .then(() => logger.info(`[Redis] Saved connection information: ${morpheusId} ${socket.id}`))
 
     if (cb !== undefined) {
       cb('Ok')
@@ -86,6 +86,16 @@ io.on('connection', socket => {
     }
   })
 
+  socket.on('confirmationReport', (data, cb) => {
+    // TODO: transmit and persist data
+
+    logger.info(`[confirmationReport] ${data}`)
+
+    if (cb !== undefined) {
+      cb('Ok')
+    }
+  })
+
   socket.on('disconnect', () => {
     logger.info(`[Socket.io] Closed connection`)
     redisClient
@@ -100,7 +110,7 @@ io.on('connection', socket => {
 // Debugging
 app.post('/message', (req, res) => {
   logger.info(`[debug] Broadcasting a mock event of type "${req.body.type}"`)
-  io.emit(req.body.type, req.body.payload)
+  io.emit(req.body.type, JSON.stringify(req.body.payload))
   res.status(200).json(req.body)
 })
 
@@ -109,7 +119,7 @@ app.post('/message/:morpheusId', (req, res) => {
     .getAsync(req.params.morpheusId)
     .then(socketId => {
       logger.info(`[debug] Emitting a mock event of type "${req.body.type}"`)
-      io.to(socketId).emit(req.body.type, req.body.payload)
+      io.to(socketId).emit(req.body.type, JSON.stringify(req.body.payload))
       res.status(200).json(req.body)
     })
 })
@@ -117,4 +127,9 @@ app.post('/message/:morpheusId', (req, res) => {
 // Listen
 server.listen((process.env.PORT || 9090), () => {
   logger.info(`[Server] Listening on port ${process.env.PORT || 9090}`)
+})
+
+// Graceful shutdown
+process.on('SIGINT', () => {
+  io.close(() => logger.info(`[Socket.io] Closed server`))
 })
